@@ -1,6 +1,7 @@
 {
   "name": "pendientes-telegram-backend",
   "version": "1.0.0",
+  "type": "module",
   "description": "Backend para sistema de pendientes por Telegram",
   "main": "dist/index.js",
   "scripts": {
@@ -10,7 +11,11 @@
     "test": "vitest",
     "migrate": "node scripts/migrate.js"
   },
-  "keywords": ["telegram", "tasks", "gemini"],
+  "keywords": [
+    "telegram",
+    "tasks",
+    "gemini"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -19,6 +24,7 @@
     "bcrypt": "^5.1.1",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
+    "dotenv": "^17.4.2",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "jsonwebtoken": "^9.0.2",
