@@ -4,11 +4,11 @@ Sistema personal de gestión de pendientes que captura mensajes de Telegram (tex
 
 ## Arquitectura
 
-- **Backend:** Node 20 + TypeScript + Express (Fly.io)
+- **Backend:** Node 20 + TypeScript + Express (Render)
 - **Base de datos:** Neon Postgres
 - **LLM:** Gemini 2.5 Flash
 - **Frontend:** Next.js 14 + Tailwind (Vercel)
-- **Cron:** Fly.io Machines
+- **Cron:** cron-job.org (keep-alive + recordatorios)
 
 ## Documentación
 
@@ -24,11 +24,19 @@ Ver archivos de planeación:
 
 ## Estado
 
-**Fase actual:** 0 (Setup inicial)
+**Fase actual:** 1 (Webhook de Telegram) - En progreso
+
+### Fases completadas
+
+- ✅ **Fase 0:** Setup inicial
+  - Backend Express + TypeScript funcionando
+  - Base de datos Neon Postgres configurada
+  - Deploy en Render: https://pendientes-telegram-backend.onrender.com
+  - Health check: https://pendientes-telegram-backend.onrender.com/health
 
 ## Quick Start
 
-### Backend
+### Backend (Local)
 
 ```bash
 cd backend
@@ -36,6 +44,13 @@ npm install
 npm run migrate  # Requiere DATABASE_URL
 npm run dev      # http://localhost:8080
 ```
+
+### Backend (Producción)
+
+El backend está desplegado en Render:
+- **URL:** https://pendientes-telegram-backend.onrender.com
+- **Health:** https://pendientes-telegram-backend.onrender.com/health
+- **Config:** Ver `backend/RENDER.md` para detalles del deploy
 
 ### Frontend
 
