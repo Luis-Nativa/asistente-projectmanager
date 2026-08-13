@@ -24,7 +24,7 @@ Ver archivos de planeación:
 
 ## Estado
 
-**Fase actual:** 1 (Webhook de Telegram) - En progreso
+**Fase actual:** 2 (Parser con Gemini) - En progreso
 
 ### Fases completadas
 
@@ -33,6 +33,21 @@ Ver archivos de planeación:
   - Base de datos Neon Postgres configurada
   - Deploy en Render: https://pendientes-telegram-backend.onrender.com
   - Health check: https://pendientes-telegram-backend.onrender.com/health
+
+- ✅ **Fase 1:** Webhook de Telegram
+  - Endpoint POST /telegram/webhook funcionando
+  - Validación de secret_token
+  - Filtrado por TELEGRAM_CHAT_ID
+  - Guardado de mensajes en inbox_messages
+  - Respuesta de confirmación al usuario
+
+- 🔄 **Fase 2:** Parser con Gemini + Executor
+  - Servicio de Gemini configurado
+  - Prompt del parser con 24 reglas
+  - Executor para convertir acciones en filas de BD
+  - Integración completa en webhook
+  - **Modelo actualizado a gemini-3.5-flash-lite** (económico y eficiente)
+  - Pendiente: Probar con mensajes reales
 
 ## Quick Start
 
