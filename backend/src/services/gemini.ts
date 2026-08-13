@@ -44,7 +44,7 @@ export interface ParserResult {
 export async function parseMessage(text: string, context: ParserContext): Promise<ParserResult> {
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-pro',
+      model: 'gemini-3.5-flash-lite',
       systemInstruction: PARSER_PROMPT
     });
 
