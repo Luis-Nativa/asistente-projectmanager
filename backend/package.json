@@ -10,7 +10,7 @@
     "start": "node dist/index.js",
     "test": "vitest",
     "migrate": "node scripts/migrate.js",
-    "seed": "node scripts/seed-owner.js"
+    "seed": "tsx scripts/seed-owner.ts"
   },
   "keywords": [
     "telegram",
