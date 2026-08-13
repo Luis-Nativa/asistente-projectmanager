@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { sendTelegramMessage } from '../services/telegram.js';
-import { saveInboxMessage } from '../services/db.js';
+import { saveInboxMessage, query } from '../services/db.js';
+import { parseMessage, type ParserContext } from '../services/gemini.js';
+import { executeActions } from '../services/executor.js';
 
 const router = Router();
 
@@ -40,14 +42,58 @@ router.post('/webhook', async (req: Request, res: Response) => {
     const inboxId = await saveInboxMessage(msgId, text);
     console.log(`✅ Mensaje guardado en inbox: ${inboxId}`);
 
-    // 6. Responder al usuario
-    await sendTelegramMessage(chatId, `✅ Recibido (ID: ${inboxId})\n\n"${text}"\n\n🔄 Parser viene en la Fase 2...`);
+    // 6. Responder inmediatamente
+    await sendTelegramMessage(chatId, '⏳ Procesando...');
+
+    // 7. Construir contexto para el parser
+    const context = await buildContext();
+
+    // 8. Parsear mensaje con Gemini
+    const result = await parseMessage(text, context);
+    console.log(`🤖 Parser generó ${result.acciones.length} acciones`);
+
+    // 9. Ejecutar acciones
+    const results = await executeActions(result.acciones, inboxId);
+
+    // 10. Enviar confirmación
+    const resumen = results.join('\n');
+    await sendTelegramMessage(chatId, `✅ Procesado:\n\n${resumen}`);
 
     res.status(200).json({ ok: true });
   } catch (error) {
     console.error('❌ Error en webhook:', error);
+    const chatId = req.body.message?.chat?.id;
+    if (chatId) {
+      await sendTelegramMessage(chatId, '❌ Error procesando el mensaje. Intenta de nuevo.');
+    }
     res.status(200).json({ ok: true }); // Siempre responder 200 a Telegram
   }
 });
+
+async function buildContext(): Promise<ParserContext> {
+  // Fecha actual en ISO 8601
+  const ahora_iso = new Date().toISOString();
+
+  // Proyectos existentes
+  const proyectosResult = await query(
+    `SELECT id, name, client FROM projects WHERE archived_at IS NULL`
+  );
+  const proyectos_existentes = proyectosResult.rows;
+
+  // Tareas abiertas recientes (últimas 30)
+  const tareasResult = await query(
+    `SELECT id, title FROM tasks 
+     WHERE status IN ('pendiente', 'en_proceso') 
+     ORDER BY created_at DESC 
+     LIMIT 30`
+  );
+  const tareas_abiertas_recientes = tareasResult.rows;
+
+  return {
+    ahora_iso,
+    proyectos_existentes,
+    tareas_abiertas_recientes
+  };
+}
 
 export default router;
