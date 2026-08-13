@@ -49,11 +49,25 @@ router.post('/webhook', async (req: Request, res: Response) => {
     const context = await buildContext();
 
     // 8. Parsear mensaje con Gemini
-    const result = await parseMessage(text, context);
-    console.log(`🤖 Parser generó ${result.acciones.length} acciones`);
+    let result;
+    try {
+      result = await parseMessage(text, context);
+      console.log(`🤖 Parser generó ${result.acciones.length} acciones`);
+    } catch (parseError) {
+      console.error('❌ Error en parseMessage:', parseError);
+      await sendTelegramMessage(chatId, `❌ Error del parser: ${parseError instanceof Error ? parseError.message : 'Error desconocido'}`);
+      return res.status(200).json({ ok: true });
+    }
 
     // 9. Ejecutar acciones
-    const results = await executeActions(result.acciones, inboxId);
+    let results;
+    try {
+      results = await executeActions(result.acciones, inboxId);
+    } catch (execError) {
+      console.error('❌ Error en executeActions:', execError);
+      await sendTelegramMessage(chatId, `❌ Error ejecutando acciones: ${execError instanceof Error ? execError.message : 'Error desconocido'}`);
+      return res.status(200).json({ ok: true });
+    }
 
     // 10. Enviar confirmación
     const resumen = results.join('\n');
@@ -64,7 +78,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
     console.error('❌ Error en webhook:', error);
     const chatId = req.body.message?.chat?.id;
     if (chatId) {
-      await sendTelegramMessage(chatId, '❌ Error procesando el mensaje. Intenta de nuevo.');
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      await sendTelegramMessage(chatId, `❌ Error procesando el mensaje: ${errorMsg}`);
     }
     res.status(200).json({ ok: true }); // Siempre responder 200 a Telegram
   }
