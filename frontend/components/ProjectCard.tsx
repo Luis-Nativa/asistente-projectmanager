@@ -51,19 +51,21 @@ export function ProjectCard({ project, canSeeMoney }: ProjectCardProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Tasks Progress */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-400 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-400" />
-              Tareas completadas
-            </span>
-            <span className="text-white font-medium">
-              {project.tasks_count - project.tasks_pending}/{project.tasks_count}
-            </span>
+        {project.tasks_count !== undefined && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-400 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                Tareas completadas
+              </span>
+              <span className="text-white font-medium">
+                {project.tasks_count - project.tasks_pending}/{project.tasks_count}
+              </span>
+            </div>
+            <Progress value={tasksPercentage} className="h-2" />
           </div>
-          <Progress value={tasksPercentage} className="h-2" />
-        </div>
-        
+        )}
+
         {/* Budget (solo si puede ver dinero) */}
         {canSeeMoney && project.budget_amount && (
           <div className="space-y-2 pt-2 border-t border-slate-700/50">
