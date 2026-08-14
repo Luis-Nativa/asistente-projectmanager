@@ -192,7 +192,7 @@ function buildReminderMessage(task: any): string {
 /**
  * Construir mensaje de briefing matutino
  */
-async function buildBriefingMessage(): Promise<string> {
+export async function buildBriefingMessage(): Promise<string> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);

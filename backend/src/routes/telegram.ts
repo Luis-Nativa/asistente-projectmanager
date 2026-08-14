@@ -4,6 +4,7 @@ import { saveInboxMessage, query } from '../services/db.js';
 import { parseMessage, type ParserContext } from '../services/gemini.js';
 import { executeActions } from '../services/executor.js';
 import { procesarConsulta, esConsulta } from '../services/consultas.js';
+import { procesarComando } from '../services/comandos.js';
 
 const router = Router();
 
@@ -46,7 +47,15 @@ router.post('/webhook', async (req: Request, res: Response) => {
     // 6. Responder inmediatamente
     await sendTelegramMessage(chatId, '⏳ Procesando...');
 
-    // 7. Detectar si es una consulta
+    // 7. Detectar si es un comando
+    if (text.startsWith('/')) {
+      const esComando = await procesarComando(chatId, text);
+      if (esComando) {
+        return res.status(200).json({ ok: true });
+      }
+    }
+
+    // 8. Detectar si es una consulta
     if (esConsulta(text)) {
       console.log(`🤔 Detectada consulta: "${text}"`);
       const answer = await procesarConsulta(text);
@@ -54,10 +63,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
       return res.status(200).json({ ok: true });
     }
 
-    // 8. Construir contexto para el parser
+    // 9. Construir contexto para el parser
     const context = await buildContext();
 
-    // 9. Parsear mensaje con Gemini
+    // 10. Parsear mensaje con Gemini
     let result;
     try {
       result = await parseMessage(text, context);
@@ -68,7 +77,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
       return res.status(200).json({ ok: true });
     }
 
-    // 10. Ejecutar acciones y recopilar resultados
+    // 11. Ejecutar acciones y recopilar resultados
     let results;
     try {
       results = await executeActions(result.acciones, inboxId);
@@ -78,18 +87,18 @@ router.post('/webhook', async (req: Request, res: Response) => {
       return res.status(200).json({ ok: true });
     }
 
-    // 11. Verificar si hay dudas que enviar por Telegram
+    // 12. Verificar si hay dudas que enviar por Telegram
     const dudas = result.acciones
       .filter((accion: any) => accion.tipo === 'consulta' && accion.duda)
       .map((accion: any) => accion.duda);
 
-    // 12. Construir mensaje de respuesta
+    // 13. Construir mensaje de respuesta
     let mensaje = '';
     if (results.length > 0) {
       mensaje += `✅ Procesado:\n\n${results.join('\n')}`;
     }
 
-    // 13. Si hay dudas, agregarlas al mensaje
+    // 14. Si hay dudas, agregarlas al mensaje
     if (dudas.length > 0) {
       const mensajeDudas = `❓ Necesito más información:\n\n${dudas.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}`;
       
@@ -100,7 +109,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
       }
     }
 
-    // 14. Enviar mensaje final (o mensaje por defecto si no hay nada que reportar)
+    // 15. Enviar mensaje final (o mensaje por defecto si no hay nada que reportar)
     if (!mensaje) {
       mensaje = '✅ Recibido';
     }
