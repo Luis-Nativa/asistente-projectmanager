@@ -6,6 +6,7 @@ import { executeActions } from '../services/executor.js';
 import { procesarConsulta, esConsulta } from '../services/consultas.js';
 import { procesarComando } from '../services/comandos.js';
 import { handleVincularCommand, findShareByChatId } from '../services/vinculation.js';
+import { processVoiceNote } from '../services/voice.js';
 
 const router = Router();
 
@@ -27,6 +28,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
     const chatId = message.chat.id;
     const msgId = message.message_id;
     const text = message.text;
+    const voice = message.voice;
+    const audio = message.audio;
 
     // 3. Determinar si es el owner o un colaborador vinculado
     const ownerChatId = parseInt(process.env.TELEGRAM_CHAT_ID || '0');
@@ -44,9 +47,71 @@ router.post('/webhook', async (req: Request, res: Response) => {
       }
     }
 
-    // 4. Solo procesar mensajes de texto (por ahora)
+    // 4. Manejar notas de voz y audio
+    if (voice || audio) {
+      const fileId = voice ? voice.file_id : audio.file_id;
+      const duration = voice ? voice.duration : audio.duration;
+      
+      // Validar duración (máximo 25 minutos)
+      if (duration > 25 * 60) {
+        await sendTelegramMessage(chatId, '⚠️ El audio es demasiado largo (máximo 25 minutos). Por favor, divide el audio en partes más pequeñas.');
+        return res.status(200).json({ ok: true });
+      }
+      
+      // Guardar mensaje en inbox
+      const inboxId = await saveInboxMessage(msgId, null);
+      console.log(`✅ Nota de voz guardada en inbox: ${inboxId}`);
+      
+      // Responder inmediatamente
+      await sendTelegramMessage(chatId, '🎤 Procesando nota de voz...');
+      
+      try {
+        // Procesar nota de voz (descargar, transcribir, guardar)
+        const transcription = await processVoiceNote(fileId, inboxId);
+        
+        // Parsear transcripción
+        const context = await buildContext(share?.project_id);
+        const result = await parseMessage(transcription, context);
+        
+        console.log(`🤖 Parser generó ${result.acciones.length} acciones de nota de voz`);
+        
+        // Si es colaborador, forzar project_id del share
+        if (share && share.project_id) {
+          result.acciones = result.acciones.map((accion: any) => {
+            if (accion.tipo === 'crear_tarea' || accion.tipo === 'crear_gasto' || accion.tipo === 'crear_nota') {
+              return { ...accion, project_id: share.project_id };
+            }
+            return accion;
+          });
+        }
+        
+        // Ejecutar acciones
+        const results = await executeActions(result.acciones, inboxId);
+        
+        // Construir mensaje de respuesta
+        let mensaje = `✅ Nota de voz procesada:\n\n${results.join('\n')}`;
+        
+        // Agregar dudas si las hay
+        const dudas = result.acciones
+          .filter((accion: any) => accion.tipo === 'consulta' && accion.duda)
+          .map((accion: any) => accion.duda);
+        
+        if (dudas.length > 0) {
+          mensaje += `\n\n❓ Necesito más información:\n\n${dudas.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}`;
+        }
+        
+        await sendTelegramMessage(chatId, mensaje);
+      } catch (error) {
+        console.error('❌ Error procesando nota de voz:', error);
+        await sendTelegramMessage(chatId, '❌ Error al procesar la nota de voz. Por favor, intenta de nuevo.');
+      }
+      
+      return res.status(200).json({ ok: true });
+    }
+
+    // 5. Solo procesar mensajes de texto
     if (!text) {
-      await sendTelegramMessage(chatId, '⚠️ Por ahora solo puedo procesar mensajes de texto. Las notas de voz vienen en la Fase 11.');
+      await sendTelegramMessage(chatId, '⚠️ Solo puedo procesar mensajes de texto y notas de voz.');
       return res.status(200).json({ ok: true });
     }
 

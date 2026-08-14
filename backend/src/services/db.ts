@@ -16,7 +16,7 @@ export async function query(text: string, params?: any[]) {
   return res;
 }
 
-export async function saveInboxMessage(tgMsgId: number, rawText: string): Promise<number> {
+export async function saveInboxMessage(tgMsgId: number, rawText: string | null): Promise<number> {
   const result = await query(
     `INSERT INTO inbox_messages (tg_msg_id, raw_text, kind, status)
      VALUES ($1, $2, 'texto', 'procesado')
