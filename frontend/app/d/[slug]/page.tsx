@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { ProjectCarousel } from '@/components/ProjectCarousel';
 import { UrgentOverdueBoard } from '@/components/UrgentOverdueBoard';
 import { NotesPanel } from '@/components/NotesPanel';
+import { ShareManagement } from '@/components/ShareManagement';
 import { LogOut, TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface DashboardData {
@@ -169,6 +170,12 @@ export default function DashboardPage() {
           <div className="pt-8 border-t border-slate-800">
             <NotesPanel />
           </div>
+
+          {share?.role === 'owner' && (
+            <div className="pt-8 border-t border-slate-800">
+              <ShareManagement />
+            </div>
+          )}
         </div>
       </div>
     </div>

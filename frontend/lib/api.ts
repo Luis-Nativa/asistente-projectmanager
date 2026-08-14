@@ -157,4 +157,12 @@ export const api = {
   ask: {
     query: (question: string) => request('/api/ask', { method: 'POST', body: { question } }),
   },
+  
+  shares: {
+    list: () => request('/api/shares'),
+    create: (data: any) => request('/api/shares', { method: 'POST', body: data }),
+    update: (id: string, data: any) => request(`/api/shares/${id}`, { method: 'PATCH', body: data }),
+    delete: (id: string) => request(`/api/shares/${id}`, { method: 'DELETE' }),
+    regeneratePin: (id: string) => request(`/api/shares/${id}/regenerate-pin`, { method: 'POST' }),
+  },
 };

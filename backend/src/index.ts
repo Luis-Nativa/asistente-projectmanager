@@ -1,10 +1,10 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
-import type { Request, Response } from 'express';
 import telegramRoutes from './routes/telegram.js';
 import authRoutes from './routes/auth.js';
 import apiRoutes from './routes/api.js';
 import internalRoutes from './routes/internal.js';
+import sharesRoutes from './routes/shares.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -32,6 +32,7 @@ app.use('/telegram', telegramRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api', apiRoutes);
 app.use('/internal', internalRoutes);
+app.use('/api/shares', sharesRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
