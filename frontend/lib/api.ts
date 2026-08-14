@@ -126,6 +126,10 @@ export const api = {
     create: (data: any) => request('/api/tasks', { method: 'POST', body: data }),
     update: (id: string, data: any) => request(`/api/tasks/${id}`, { method: 'PATCH', body: data }),
     delete: (id: string) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
+    addSubtask: (taskId: string, data: { title: string; position?: number }) => 
+      request(`/api/tasks/${taskId}/subtasks`, { method: 'POST', body: data }),
+    updateSubtask: (subtaskId: string, data: any) => 
+      request(`/api/subtasks/${subtaskId}`, { method: 'PATCH', body: data }),
   },
   
   projects: {

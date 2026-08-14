@@ -416,4 +416,561 @@ router.get('/notes', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================
+// ENDPOINTS DE ESCRITURA (FASE 4)
+// ============================================
+
+// POST /api/tasks - Crear tarea
+router.post('/tasks', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    
+    if (!scope.can_create) {
+      return res.status(403).json({ error: 'No autorizado para crear tareas' });
+    }
+    
+    const { title, detail, project_id, person, assigned_to, priority, due_at, starts_at, tags } = req.body;
+    
+    if (!title) {
+      return res.status(400).json({ error: 'El título es obligatorio' });
+    }
+    
+    // Validar que project_id esté dentro del scope
+    if (project_id && scope.project_id && project_id !== scope.project_id) {
+      return res.status(403).json({ error: 'No autorizado para este proyecto' });
+    }
+    
+    const result = await query(
+      `INSERT INTO tasks (title, detail, project_id, person, assigned_to, priority, due_at, starts_at, tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [
+        title,
+        detail || null,
+        project_id || scope.project_id || null,
+        person || null,
+        assigned_to || null,
+        priority || 3,
+        due_at || null,
+        starts_at || null,
+        tags || []
+      ]
+    );
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'task', $3, 'creo', $4)`,
+      [scope.id, scope.label, result.rows[0].id, JSON.stringify({ title })]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error en POST /api/tasks:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// DELETE /api/tasks/:id - Eliminar tarea
+router.delete('/tasks/:id', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    const { id } = req.params;
+    
+    if (!scope.can_create) {
+      return res.status(403).json({ error: 'No autorizado para eliminar tareas' });
+    }
+    
+    const existingResult = await query('SELECT * FROM tasks WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    const task = existingResult.rows[0];
+    
+    if (task.private && scope.role !== 'owner') {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    if (scope.project_id && task.project_id !== scope.project_id) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    
+    await query('DELETE FROM tasks WHERE id = $1', [id]);
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'task', $3, 'elimino', $4)`,
+      [scope.id, scope.label, id, JSON.stringify({ title: task.title })]
+    );
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('❌ Error en DELETE /api/tasks/:id:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// POST /api/projects - Crear proyecto
+router.post('/projects', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    
+    if (!scope.can_create) {
+      return res.status(403).json({ error: 'No autorizado para crear proyectos' });
+    }
+    
+    const { name, client, budget_amount, currency, notes } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'El nombre es obligatorio' });
+    }
+    
+    const result = await query(
+      `INSERT INTO projects (name, client, budget_amount, currency, notes)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [name, client || null, budget_amount || null, currency || 'MXN', notes || null]
+    );
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'project', $3, 'creo', $4)`,
+      [scope.id, scope.label, result.rows[0].id, JSON.stringify({ name })]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error en POST /api/projects:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// PATCH /api/projects/:id - Editar proyecto
+router.patch('/projects/:id', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    const { id } = req.params;
+    const { name, client, budget_amount, currency, notes, status } = req.body;
+    
+    if (!scope.can_create) {
+      return res.status(403).json({ error: 'No autorizado para editar proyectos' });
+    }
+    
+    const existingResult = await query('SELECT * FROM projects WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    
+    if (scope.project_id && id !== scope.project_id) {
+      return res.status(403).json({ error: 'No autorizado para este proyecto' });
+    }
+    
+    const updates: string[] = [];
+    const params: any[] = [];
+    let paramCount = 1;
+    
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount}`);
+      params.push(name);
+      paramCount++;
+    }
+    if (client !== undefined) {
+      updates.push(`client = $${paramCount}`);
+      params.push(client);
+      paramCount++;
+    }
+    if (budget_amount !== undefined) {
+      updates.push(`budget_amount = $${paramCount}`);
+      params.push(budget_amount);
+      paramCount++;
+    }
+    if (currency !== undefined) {
+      updates.push(`currency = $${paramCount}`);
+      params.push(currency);
+      paramCount++;
+    }
+    if (notes !== undefined) {
+      updates.push(`notes = $${paramCount}`);
+      params.push(notes);
+      paramCount++;
+    }
+    if (status !== undefined) {
+      updates.push(`status = $${paramCount}`);
+      params.push(status);
+      paramCount++;
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'Nada para actualizar' });
+    }
+    
+    params.push(id);
+    const result = await query(
+      `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      params
+    );
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'project', $3, 'edito', $4)`,
+      [scope.id, scope.label, id, JSON.stringify(req.body)]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error en PATCH /api/projects/:id:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// POST /api/expenses - Crear gasto
+router.post('/expenses', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    
+    if (!scope.can_create) {
+      return res.status(403).json({ error: 'No autorizado para crear gastos' });
+    }
+    
+    if (!scope.can_see_money) {
+      return res.status(403).json({ error: 'No autorizado para ver gastos' });
+    }
+    
+    const { concept, amount, currency, kind, project_id, person, due_at, status } = req.body;
+    
+    if (!concept || !amount) {
+      return res.status(400).json({ error: 'Concepto y monto son obligatorios' });
+    }
+    
+    if (project_id && scope.project_id && project_id !== scope.project_id) {
+      return res.status(403).json({ error: 'No autorizado para este proyecto' });
+    }
+    
+    const result = await query(
+      `INSERT INTO expenses (concept, amount, currency, kind, project_id, person, due_at, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        concept,
+        amount,
+        currency || 'MXN',
+        kind || 'gasto',
+        project_id || scope.project_id || null,
+        person || null,
+        due_at || null,
+        status || 'pendiente'
+      ]
+    );
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'expense', $3, 'creo', $4)`,
+      [scope.id, scope.label, result.rows[0].id, JSON.stringify({ concept, amount })]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error en POST /api/expenses:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// PATCH /api/expenses/:id - Editar gasto
+router.patch('/expenses/:id', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    const { id } = req.params;
+    const { concept, amount, currency, kind, person, due_at, status, paid_at } = req.body;
+    
+    if (!scope.can_create) {
+      return res.status(403).json({ error: 'No autorizado para editar gastos' });
+    }
+    
+    if (!scope.can_see_money) {
+      return res.status(403).json({ error: 'No autorizado para ver gastos' });
+    }
+    
+    const existingResult = await query('SELECT * FROM expenses WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Gasto no encontrado' });
+    }
+    const expense = existingResult.rows[0];
+    
+    if (scope.project_id && expense.project_id !== scope.project_id) {
+      return res.status(403).json({ error: 'No autorizado para este proyecto' });
+    }
+    
+    const updates: string[] = [];
+    const params: any[] = [];
+    let paramCount = 1;
+    
+    if (concept !== undefined) {
+      updates.push(`concept = $${paramCount}`);
+      params.push(concept);
+      paramCount++;
+    }
+    if (amount !== undefined) {
+      updates.push(`amount = $${paramCount}`);
+      params.push(amount);
+      paramCount++;
+    }
+    if (currency !== undefined) {
+      updates.push(`currency = $${paramCount}`);
+      params.push(currency);
+      paramCount++;
+    }
+    if (kind !== undefined) {
+      updates.push(`kind = $${paramCount}`);
+      params.push(kind);
+      paramCount++;
+    }
+    if (person !== undefined) {
+      updates.push(`person = $${paramCount}`);
+      params.push(person);
+      paramCount++;
+    }
+    if (due_at !== undefined) {
+      updates.push(`due_at = $${paramCount}`);
+      params.push(due_at);
+      paramCount++;
+    }
+    if (status !== undefined) {
+      updates.push(`status = $${paramCount}`);
+      params.push(status);
+      paramCount++;
+      
+      if (status === 'pagado') {
+        updates.push(`paid_at = $${paramCount}`);
+        params.push(paid_at || new Date());
+        paramCount++;
+      }
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'Nada para actualizar' });
+    }
+    
+    params.push(id);
+    const result = await query(
+      `UPDATE expenses SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      params
+    );
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'expense', $3, 'edito', $4)`,
+      [scope.id, scope.label, id, JSON.stringify(req.body)]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error en PATCH /api/expenses/:id:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// POST /api/notes - Crear nota
+router.post('/notes', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    
+    if (!scope.can_create) {
+      return res.status(403).json({ error: 'No autorizado para crear notas' });
+    }
+    
+    const { content, project_id, tags } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ error: 'El contenido es obligatorio' });
+    }
+    
+    if (project_id && scope.project_id && project_id !== scope.project_id) {
+      return res.status(403).json({ error: 'No autorizado para este proyecto' });
+    }
+    
+    const result = await query(
+      `INSERT INTO notes (content, project_id, tags)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [content, project_id || scope.project_id || null, tags || []]
+    );
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'note', $3, 'creo', $4)`,
+      [scope.id, scope.label, result.rows[0].id, JSON.stringify({ content: content.substring(0, 50) })]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error en POST /api/notes:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// DELETE /api/notes/:id - Eliminar nota
+router.delete('/notes/:id', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    const { id } = req.params;
+    
+    if (!scope.can_create) {
+      return res.status(403).json({ error: 'No autorizado para eliminar notas' });
+    }
+    
+    const existingResult = await query('SELECT * FROM notes WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Nota no encontrada' });
+    }
+    const note = existingResult.rows[0];
+    
+    if (scope.project_id && note.project_id !== scope.project_id) {
+      return res.status(403).json({ error: 'No autorizado para este proyecto' });
+    }
+    
+    await query('DELETE FROM notes WHERE id = $1', [id]);
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'note', $3, 'elimino', $4)`,
+      [scope.id, scope.label, id, JSON.stringify({ content: note.content.substring(0, 50) })]
+    );
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('❌ Error en DELETE /api/notes/:id:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// POST /api/tasks/:id/subtasks - Crear subtarea
+router.post('/tasks/:id/subtasks', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    const { id: taskId } = req.params;
+    const { title, position } = req.body;
+    
+    if (!scope.can_create) {
+      return res.status(403).json({ error: 'No autorizado para crear subtareas' });
+    }
+    
+    if (!title) {
+      return res.status(400).json({ error: 'El título es obligatorio' });
+    }
+    
+    const taskResult = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+    if (taskResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    const task = taskResult.rows[0];
+    
+    if (task.private && scope.role !== 'owner') {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    if (scope.project_id && task.project_id !== scope.project_id) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    
+    const result = await query(
+      `INSERT INTO subtasks (task_id, title, position)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [taskId, title, position || 0]
+    );
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'subtask', $3, 'creo', $4)`,
+      [scope.id, scope.label, result.rows[0].id, JSON.stringify({ title, task_id: taskId })]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error en POST /api/tasks/:id/subtasks:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// PATCH /api/subtasks/:id - Editar subtarea
+router.patch('/subtasks/:id', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    const { id } = req.params;
+    const { title, done, position } = req.body;
+    
+    if (!scope.can_complete && done !== undefined) {
+      return res.status(403).json({ error: 'No autorizado para completar subtareas' });
+    }
+    
+    const existingResult = await query(
+      `SELECT s.*, t.project_id, t.private 
+       FROM subtasks s 
+       JOIN tasks t ON t.id = s.task_id 
+       WHERE s.id = $1`,
+      [id]
+    );
+    
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Subtarea no encontrada' });
+    }
+    const subtask = existingResult.rows[0];
+    
+    if (subtask.private && scope.role !== 'owner') {
+      return res.status(404).json({ error: 'Subtarea no encontrada' });
+    }
+    if (scope.project_id && subtask.project_id !== scope.project_id) {
+      return res.status(404).json({ error: 'Subtarea no encontrada' });
+    }
+    
+    const updates: string[] = [];
+    const params: any[] = [];
+    let paramCount = 1;
+    
+    if (title !== undefined) {
+      updates.push(`title = $${paramCount}`);
+      params.push(title);
+      paramCount++;
+    }
+    if (done !== undefined) {
+      updates.push(`done = $${paramCount}`);
+      params.push(done);
+      paramCount++;
+    }
+    if (position !== undefined) {
+      updates.push(`position = $${paramCount}`);
+      params.push(position);
+      paramCount++;
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'Nada para actualizar' });
+    }
+    
+    params.push(id);
+    const result = await query(
+      `UPDATE subtasks SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      params
+    );
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'subtask', $3, 'edito', $4)`,
+      [scope.id, scope.label, id, JSON.stringify(req.body)]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error en PATCH /api/subtasks/:id:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 export default router;
