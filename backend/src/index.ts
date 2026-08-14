@@ -5,6 +5,9 @@ import authRoutes from './routes/auth.js';
 import apiRoutes from './routes/api.js';
 import internalRoutes from './routes/internal.js';
 import sharesRoutes from './routes/shares.js';
+import activityRoutes from './routes/activity.js';
+import commentsRoutes from './routes/comments.js';
+import reviewRoutes from './routes/review.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -33,6 +36,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api', apiRoutes);
 app.use('/internal', internalRoutes);
 app.use('/api/shares', sharesRoutes);
+app.use('/api/activity', activityRoutes);
+app.use('/api', commentsRoutes);
+app.use('/api', reviewRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

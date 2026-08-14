@@ -165,4 +165,24 @@ export const api = {
     delete: (id: string) => request(`/api/shares/${id}`, { method: 'DELETE' }),
     regeneratePin: (id: string) => request(`/api/shares/${id}/regenerate-pin`, { method: 'POST' }),
   },
+  
+  activity: {
+    list: (params?: { limit?: number; entity_type?: string; entity_id?: string }) => {
+      const query = new URLSearchParams(params as any).toString();
+      return request(`/api/activity${query ? '?' + query : ''}`);
+    },
+  },
+  
+  comments: {
+    list: (taskId: string) => request(`/api/tasks/${taskId}/comments`),
+    create: (taskId: string, body: string) => request(`/api/tasks/${taskId}/comments`, { method: 'POST', body: { body } }),
+    delete: (commentId: string) => request(`/api/comments/${commentId}`, { method: 'DELETE' }),
+  },
+  
+  review: {
+    get: (projectId: string, since?: string) => {
+      const query = since ? `?since=${since}` : '';
+      return request(`/api/projects/${projectId}/review${query}`);
+    },
+  },
 };
