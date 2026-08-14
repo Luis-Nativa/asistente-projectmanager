@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
+import { Lock, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function PinPage() {
   const router = useRouter();
@@ -19,14 +20,12 @@ export default function PinPage() {
   const [attempts, setAttempts] = useState(0);
   
   useEffect(() => {
-    // Verificar si ya hay token válido
     const token = localStorage.getItem('token');
     const share = localStorage.getItem('share');
     
     if (token && share) {
       const shareData = JSON.parse(share);
       if (shareData.id) {
-        // Ya autenticado, redirigir al dashboard
         router.push(`/d/${slug}`);
       }
     }
@@ -51,53 +50,84 @@ export default function PinPage() {
   };
   
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
-      <Card className="w-full max-w-md bg-slate-800 border-slate-700">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-slate-100">Sistema de Pendientes</CardTitle>
-          <CardDescription className="text-slate-400">
-            Ingresa tu PIN para acceder
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="pin" className="text-slate-300">PIN de 6 dígitos</Label>
-              <Input
-                id="pin"
-                type="password"
-                placeholder="••••••"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                maxLength={6}
-                pattern="[0-9]{6}"
-                className="bg-slate-900 border-slate-700 text-slate-100 text-center text-2xl tracking-widest"
-                autoFocus
-                disabled={loading}
-              />
-            </div>
-            
-            {error && (
-              <div className="p-3 rounded-lg bg-red-900/20 border border-red-900/50">
-                <p className="text-sm text-red-400">{error}</p>
-                {attempts >= 3 && (
-                  <p className="text-xs text-red-400 mt-1">
-                    Demasiados intentos. Espera 15 minutos.
-                  </p>
-                )}
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-blue-500/30">
+            <Lock className="w-8 h-8 text-white" />
+          </div>
+        </div>
+        
+        <Card className="bg-slate-800/50 backdrop-blur-xl border-slate-700/50 shadow-2xl">
+          <CardHeader className="text-center space-y-2">
+            <CardTitle className="text-2xl font-bold text-white">
+              Acceso al Dashboard
+            </CardTitle>
+            <CardDescription className="text-slate-400">
+              Ingresa tu PIN de 6 dígitos para continuar
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="pin" className="text-slate-300 font-medium">
+                  PIN de acceso
+                </Label>
+                <Input
+                  id="pin"
+                  type="password"
+                  placeholder="••••••"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  maxLength={6}
+                  pattern="[0-9]{6}"
+                  className="bg-slate-900/50 border-slate-700/50 text-white text-center text-2xl tracking-widest h-14 focus:border-blue-500 focus:ring-blue-500/20"
+                  autoFocus
+                  disabled={loading}
+                />
               </div>
-            )}
-            
-            <Button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              disabled={loading || pin.length !== 6 || attempts >= 5}
-            >
-              {loading ? 'Autenticando...' : 'Acceder'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+              
+              {error && (
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-red-400 font-medium">{error}</p>
+                      {attempts >= 3 && (
+                        <p className="text-xs text-red-400/80 mt-1">
+                          Demasiados intentos. Espera 15 minutos.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <Button
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 transition-all duration-200"
+                disabled={loading || pin.length !== 6 || attempts >= 5}
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Verificando...
+                  </span>
+                ) : (
+                  'Acceder'
+                )}
+              </Button>
+              
+              <div className="pt-4 border-t border-slate-700/50">
+                <p className="text-xs text-slate-500 text-center">
+                  ¿Olvidaste tu PIN? Contacta al administrador del sistema.
+                </p>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
