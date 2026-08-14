@@ -59,6 +59,10 @@ router.get('/dashboard', async (req: Request, res: Response) => {
       [scope.project_id, scope.role === 'owner']
     );
     
+    // Definir fecha actual para tareas vencidas
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     // Obtener tareas vencidas
     const tasksOverdueResult = await query(
       `SELECT t.*, p.name as project_name,
