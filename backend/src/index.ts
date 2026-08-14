@@ -8,6 +8,9 @@ import apiRoutes from './routes/api.js';
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Configurar trust proxy para Render
+app.set('trust proxy', true);
+
 // Configurar CORS para permitir requests desde el frontend
 app.use(cors({
   origin: '*', // Permitir todos los orígenes (puedes restringir después)

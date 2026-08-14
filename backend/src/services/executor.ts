@@ -74,7 +74,7 @@ async function crearGasto(accion: Accion, inboxMessageId: number) {
      due_at, source_msg_id, confirmed)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)`,
     [
-      accion.title || accion.content,
+      accion.title || accion.content || accion.detail || 'Gasto sin descripción',
       accion.amount,
       accion.currency || 'MXN',
       accion.kind || 'gasto',
@@ -91,7 +91,7 @@ async function crearNota(accion: Accion, inboxMessageId: number) {
     `INSERT INTO notes (content, project_id, tags, source_msg_id)
      VALUES ($1, $2, $3, $4)`,
     [
-      accion.content || accion.detail,
+      accion.content || accion.detail || 'Nota sin contenido',
       accion.project_id || null,
       accion.tags || [],
       inboxMessageId

@@ -59,7 +59,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
       return res.status(200).json({ ok: true });
     }
 
-    // 9. Ejecutar acciones
+    // 9. Ejecutar acciones y recopilar resultados
     let results;
     try {
       results = await executeActions(result.acciones, inboxId);
@@ -69,9 +69,34 @@ router.post('/webhook', async (req: Request, res: Response) => {
       return res.status(200).json({ ok: true });
     }
 
-    // 10. Enviar confirmación
-    const resumen = results.join('\n');
-    await sendTelegramMessage(chatId, `✅ Procesado:\n\n${resumen}`);
+    // 10. Verificar si hay dudas que enviar por Telegram
+    const dudas = result.acciones
+      .filter((accion: any) => accion.tipo === 'consulta' && accion.duda)
+      .map((accion: any) => accion.duda);
+
+    // 11. Construir mensaje de respuesta
+    let mensaje = '';
+    if (results.length > 0) {
+      mensaje += `✅ Procesado:\n\n${results.join('\n')}`;
+    }
+
+    // 12. Si hay dudas, agregarlas al mensaje
+    if (dudas.length > 0) {
+      const mensajeDudas = `❓ Necesito más información:\n\n${dudas.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}`;
+      
+      if (mensaje) {
+        mensaje += `\n\n${mensajeDudas}`;
+      } else {
+        mensaje = mensajeDudas;
+      }
+    }
+
+    // 13. Enviar mensaje final (o mensaje por defecto si no hay nada que reportar)
+    if (!mensaje) {
+      mensaje = '✅ Recibido';
+    }
+
+    await sendTelegramMessage(chatId, mensaje);
 
     res.status(200).json({ ok: true });
   } catch (error) {

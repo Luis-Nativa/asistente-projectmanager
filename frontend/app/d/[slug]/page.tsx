@@ -10,7 +10,7 @@ import { LogOut, TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface DashboardData {
   projects: any[];
-  tasks_today: any[];
+  tasks_pending: any[];
   tasks_overdue: any[];
   expenses_pending: any[];
 }
@@ -83,8 +83,8 @@ export default function DashboardPage() {
   
   const stats = [
     {
-      label: 'Tareas Hoy',
-      value: data.tasks_today.length,
+      label: 'Tareas Pendientes',
+      value: data.tasks_pending.length,
       icon: CheckCircle2,
       color: 'text-green-400',
       bgColor: 'bg-green-500/10'
@@ -158,11 +158,11 @@ export default function DashboardPage() {
         
         {/* Main Content - 3 Columnas en desktop, 1 columna en móvil */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna 1: Hoy y Vencidas */}
+          {/* Columna 1: Pendientes y Vencidas */}
           <div className="space-y-6">
             <TaskList
-              title="Hoy"
-              tasks={data.tasks_today}
+              title="Pendientes"
+              tasks={data.tasks_pending}
               onTaskUpdate={loadDashboard}
             />
             <TaskList

@@ -47,22 +47,16 @@ router.get('/dashboard', async (req: Request, res: Response) => {
       })
     );
     
-    // Obtener tareas de hoy
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    const tasksTodayResult = await query(
+    // Obtener todas las tareas pendientes (no solo las de hoy)
+    const tasksPendingResult = await query(
       `SELECT t.*, p.name as project_name 
        FROM tasks t
        LEFT JOIN projects p ON p.id = t.project_id
        WHERE t.status IN ('pendiente', 'en_proceso')
-         AND t.due_at >= $1 AND t.due_at < $2
-         AND ($3::uuid IS NULL OR t.project_id = $3)
-         AND ($4::boolean OR t.private = false)
-       ORDER BY t.priority, t.due_at`,
-      [today, tomorrow, scope.project_id, scope.role === 'owner']
+         AND ($1::uuid IS NULL OR t.project_id = $1)
+         AND ($2::boolean OR t.private = false)
+       ORDER BY t.due_at NULLS LAST, t.priority`,
+      [scope.project_id, scope.role === 'owner']
     );
     
     // Obtener tareas vencidas
@@ -92,7 +86,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     
     res.json({
       projects: projectsWithBudget,
-      tasks_today: tasksTodayResult.rows,
+      tasks_pending: tasksPendingResult.rows,
       tasks_overdue: tasksOverdueResult.rows,
       expenses_pending: scope.can_see_money ? expensesPendingResult.rows : []
     });
