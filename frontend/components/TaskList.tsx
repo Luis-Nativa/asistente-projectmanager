@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { toast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -25,15 +27,38 @@ interface TaskListProps {
 }
 
 export function TaskList({ title, tasks, onTaskUpdate, variant = 'default' }: TaskListProps) {
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+
   const handleComplete = async (taskId: string) => {
+    setCheckedIds((prev) => new Set(prev).add(taskId));
+    setPendingIds((prev) => new Set(prev).add(taskId));
+
     try {
       await api.tasks.update(taskId, { status: 'hecho' });
+      toast.add({ title: 'Tarea completada', type: 'success' });
       onTaskUpdate();
     } catch (error) {
       console.error('Error completando tarea:', error);
+      setCheckedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
+      toast.add({
+        title: 'No se pudo completar la tarea',
+        description: error instanceof Error ? error.message : undefined,
+        type: 'error',
+      });
+    } finally {
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
     }
   };
-  
+
   const getPriorityConfig = (priority: number) => {
     switch (priority) {
       case 1: return { 
@@ -116,7 +141,11 @@ export function TaskList({ title, tasks, onTaskUpdate, variant = 'default' }: Ta
                 <div className="flex items-start gap-3">
                   <Checkbox
                     id={task.id}
-                    onCheckedChange={() => handleComplete(task.id)}
+                    checked={checkedIds.has(task.id)}
+                    disabled={pendingIds.has(task.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) handleComplete(task.id);
+                    }}
                     className="mt-1 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                   />
                   <div className="flex-1 min-w-0">

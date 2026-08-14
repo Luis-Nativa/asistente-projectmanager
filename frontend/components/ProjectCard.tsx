@@ -1,12 +1,23 @@
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { TrendingUp, DollarSign, CheckCircle2 } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
+import { TrendingUp, DollarSign, CheckCircle2, Building2 } from 'lucide-react';
 
 interface Project {
   id: string;
   name: string;
+  client?: string;
+  status?: string;
+  notes?: string;
   budget_amount?: number;
   spent?: number;
   remaining?: number;
@@ -20,6 +31,8 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project, canSeeMoney }: ProjectCardProps) {
+  const [open, setOpen] = useState(false);
+
   const budgetPercentage = project.budget_amount && project.spent
     ? (project.spent / project.budget_amount) * 100
     : 0;
@@ -91,13 +104,84 @@ export function ProjectCard({ project, canSeeMoney }: ProjectCardProps) {
         )}
         
         {/* Action Button */}
-        <button className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/30 hover:bg-slate-700/50 border border-slate-600/30 hover:border-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-all duration-200 text-sm font-medium">
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/30 hover:bg-slate-700/50 border border-slate-600/30 hover:border-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-all duration-200 text-sm font-medium cursor-pointer"
+        >
           Ver detalle
           <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
       </CardContent>
+
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{project.name}</SheetTitle>
+            {project.client && (
+              <SheetDescription className="flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5" />
+                {project.client}
+              </SheetDescription>
+            )}
+          </SheetHeader>
+
+          <div className="flex flex-col gap-4 px-4">
+            {project.status && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Estado</span>
+                <span className="capitalize font-medium">{project.status}</span>
+              </div>
+            )}
+
+            {project.tasks_count !== undefined && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    Tareas completadas
+                  </span>
+                  <span className="font-medium">
+                    {project.tasks_count - project.tasks_pending}/{project.tasks_count}
+                  </span>
+                </div>
+                <Progress value={tasksPercentage} className="h-2" />
+              </div>
+            )}
+
+            {canSeeMoney && project.budget_amount && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-green-500" />
+                    Presupuesto
+                  </span>
+                  <span className="font-medium">
+                    {formatMoney(project.spent || 0)} / {formatMoney(project.budget_amount)}
+                  </span>
+                </div>
+                <Progress value={budgetPercentage} className="h-2" />
+                {project.remaining !== undefined && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Restante</span>
+                    <span className="text-green-500 font-medium">
+                      {formatMoney(project.remaining)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {project.notes && (
+              <div className="space-y-1 pt-2 border-t border-border">
+                <span className="text-sm text-muted-foreground">Notas</span>
+                <p className="text-sm whitespace-pre-wrap">{project.notes}</p>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </Card>
   );
 }

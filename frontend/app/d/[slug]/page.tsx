@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { TaskList } from '@/components/TaskList';
-import { ProjectCard } from '@/components/ProjectCard';
+import { ProjectCarousel } from '@/components/ProjectCarousel';
+import { UrgentOverdueBoard } from '@/components/UrgentOverdueBoard';
 import { NotesPanel } from '@/components/NotesPanel';
 import { LogOut, TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -156,49 +156,17 @@ export default function DashboardPage() {
           ))}
         </div>
         
-        {/* Main Content - 3 Columnas en desktop, 1 columna en móvil */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Columna 1: Pendientes y Vencidas */}
-          <div className="space-y-6">
-            <TaskList
-              title="Pendientes"
-              tasks={data.tasks_pending}
-              onTaskUpdate={loadDashboard}
-            />
-            <TaskList
-              title="Vencidas"
-              tasks={data.tasks_overdue}
-              onTaskUpdate={loadDashboard}
-              variant="overdue"
-            />
-          </div>
-          
-          {/* Columna 2: Proyectos */}
-          <div className="space-y-6">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-blue-400" />
-              Proyectos
-            </h2>
-            {data.projects.length === 0 ? (
-              <div className="p-8 bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl text-center">
-                <p className="text-slate-400">No hay proyectos aún</p>
-                <p className="text-sm text-slate-500 mt-2">
-                  Envía mensajes por Telegram para crear proyectos
-                </p>
-              </div>
-            ) : (
-              data.projects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  canSeeMoney={share?.can_see_money}
-                />
-              ))
-            )}
-          </div>
-          
-          {/* Columna 3: Notas */}
-          <div>
+        {/* Jerarquía vertical: proyectos → tareas accionables → notas/ideas aisladas */}
+        <div className="flex flex-col gap-10">
+          <ProjectCarousel projects={data.projects} canSeeMoney={share?.can_see_money} />
+
+          <UrgentOverdueBoard
+            tasksPending={data.tasks_pending}
+            tasksOverdue={data.tasks_overdue}
+            onTaskUpdate={loadDashboard}
+          />
+
+          <div className="pt-8 border-t border-slate-800">
             <NotesPanel />
           </div>
         </div>

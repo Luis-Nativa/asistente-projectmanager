@@ -12,10 +12,16 @@ router.get('/dashboard', async (req: Request, res: Response) => {
   try {
     const scope = req.scope!;
     
-    // Obtener proyectos
-    const projectsQuery = scope.project_id 
-      ? 'SELECT * FROM projects WHERE id = $1 AND archived_at IS NULL'
-      : 'SELECT * FROM projects WHERE archived_at IS NULL';
+    // Obtener proyectos (con conteo de tareas, espejo de GET /api/projects)
+    const projectsQuery = scope.project_id
+      ? `SELECT p.*,
+          (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status <> 'cancelado') as tasks_count,
+          (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status IN ('pendiente', 'en_proceso')) as tasks_pending
+         FROM projects p WHERE p.id = $1 AND p.archived_at IS NULL`
+      : `SELECT p.*,
+          (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status <> 'cancelado') as tasks_count,
+          (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status IN ('pendiente', 'en_proceso')) as tasks_pending
+         FROM projects p WHERE p.archived_at IS NULL`;
     
     const projectsResult = await query(projectsQuery, scope.project_id ? [scope.project_id] : []);
     const projects = projectsResult.rows;
@@ -169,6 +175,90 @@ router.get('/tasks', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('❌ Error en GET /api/tasks:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// PATCH /api/tasks/:id
+router.patch('/tasks/:id', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    const { id } = req.params;
+    const { status, title, detail, due_at, starts_at, priority } = req.body;
+
+    const existingResult = await query('SELECT * FROM tasks WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    const task = existingResult.rows[0];
+
+    // Ocultar tareas privadas y fuera de scope como si no existieran
+    if (task.private && scope.role !== 'owner') {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    if (scope.project_id && task.project_id !== scope.project_id) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+
+    if (status === 'hecho' && !scope.can_complete) {
+      return res.status(403).json({ error: 'No autorizado para completar tareas' });
+    }
+
+    const updates: string[] = [];
+    const params: any[] = [];
+    let paramCount = 1;
+
+    if (status !== undefined) {
+      updates.push(`status = $${paramCount}`);
+      params.push(status);
+      paramCount++;
+
+      if (status === 'hecho') {
+        updates.push(`completed_at = now()`);
+        updates.push(`completed_by = $${paramCount}`);
+        params.push(scope.label);
+        paramCount++;
+      }
+    }
+    if (title !== undefined) {
+      updates.push(`title = $${paramCount}`);
+      params.push(title);
+      paramCount++;
+    }
+    if (detail !== undefined) {
+      updates.push(`detail = $${paramCount}`);
+      params.push(detail);
+      paramCount++;
+    }
+    if (due_at !== undefined) {
+      updates.push(`due_at = $${paramCount}`);
+      params.push(due_at);
+      paramCount++;
+    }
+    if (starts_at !== undefined) {
+      updates.push(`starts_at = $${paramCount}`);
+      params.push(starts_at);
+      paramCount++;
+    }
+    if (priority !== undefined) {
+      updates.push(`priority = $${paramCount}`);
+      params.push(priority);
+      paramCount++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'Nada para actualizar' });
+    }
+
+    params.push(id);
+    const result = await query(
+      `UPDATE tasks SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      params
+    );
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Error en PATCH /api/tasks/:id:', error);
     res.status(500).json({ error: 'Error interno' });
   }
 });
