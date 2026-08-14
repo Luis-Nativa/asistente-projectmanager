@@ -3,6 +3,8 @@ import { authMiddleware } from '../middleware/auth.js';
 import { query } from '../services/db.js';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { generateVinculationCode } from '../services/vinculation.js';
+import { sendTelegramMessage } from '../services/telegram.js';
 
 const router = Router();
 
@@ -251,6 +253,40 @@ router.post('/:id/regenerate-pin', async (req: Request, res: Response) => {
     res.json({ pin: newPin });
   } catch (error) {
     console.error('❌ Error en POST /api/shares/:id/regenerate-pin:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// POST /api/shares/:id/generate-vinculation-code - Generar código de vinculación de Telegram
+router.post('/:id/generate-vinculation-code', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    const id = req.params.id as string;
+    
+    if (scope.role !== 'owner') {
+      return res.status(403).json({ error: 'Solo el owner puede generar códigos de vinculación' });
+    }
+    
+    const existingResult = await query('SELECT * FROM shares WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Share no encontrado' });
+    }
+    
+    const share = existingResult.rows[0];
+    
+    // Generar código de vinculación
+    const code = await generateVinculationCode(id);
+    
+    // Enviar código por Telegram al owner
+    const ownerChatId = parseInt(process.env.TELEGRAM_CHAT_ID || '0');
+    if (ownerChatId) {
+      const message = `🔗 Código de vinculación para *${share.label}*:\n\n\`${code}\`\n\nEste código expira en 10 minutos.\n\nEl colaborador debe enviar:\n/vincular ${code}`;
+      await sendTelegramMessage(ownerChatId, message);
+    }
+    
+    res.json({ code, expiresIn: 600 }); // 600 segundos = 10 minutos
+  } catch (error) {
+    console.error('❌ Error en POST /api/shares/:id/generate-vinculation-code:', error);
     res.status(500).json({ error: 'Error interno' });
   }
 });

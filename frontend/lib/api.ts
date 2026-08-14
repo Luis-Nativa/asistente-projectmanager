@@ -164,6 +164,7 @@ export const api = {
     update: (id: string, data: any) => request(`/api/shares/${id}`, { method: 'PATCH', body: data }),
     delete: (id: string) => request(`/api/shares/${id}`, { method: 'DELETE' }),
     regeneratePin: (id: string) => request(`/api/shares/${id}/regenerate-pin`, { method: 'POST' }),
+    generateVinculationCode: (id: string) => request(`/api/shares/${id}/generate-vinculation-code`, { method: 'POST' }),
   },
   
   activity: {

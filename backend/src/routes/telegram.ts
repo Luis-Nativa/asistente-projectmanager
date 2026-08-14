@@ -5,6 +5,7 @@ import { parseMessage, type ParserContext } from '../services/gemini.js';
 import { executeActions } from '../services/executor.js';
 import { procesarConsulta, esConsulta } from '../services/consultas.js';
 import { procesarComando } from '../services/comandos.js';
+import { handleVincularCommand, findShareByChatId } from '../services/vinculation.js';
 
 const router = Router();
 
@@ -27,11 +28,20 @@ router.post('/webhook', async (req: Request, res: Response) => {
     const msgId = message.message_id;
     const text = message.text;
 
-    // 3. Validar que el chat.id sea el autorizado
+    // 3. Determinar si es el owner o un colaborador vinculado
     const ownerChatId = parseInt(process.env.TELEGRAM_CHAT_ID || '0');
-    if (chatId !== ownerChatId) {
-      console.warn(`⚠️ Chat no autorizado: ${chatId}`);
-      return res.status(200).json({ ok: true });
+    const isOwner = chatId === ownerChatId;
+    
+    // Si no es el owner, buscar si está vinculado
+    let share = null;
+    if (!isOwner) {
+      share = await findShareByChatId(chatId);
+      
+      // Si no está vinculado y no es el owner, ignorar
+      if (!share) {
+        console.warn(`⚠️ Chat no autorizado: ${chatId}`);
+        return res.status(200).json({ ok: true });
+      }
     }
 
     // 4. Solo procesar mensajes de texto (por ahora)
@@ -40,14 +50,20 @@ router.post('/webhook', async (req: Request, res: Response) => {
       return res.status(200).json({ ok: true });
     }
 
-    // 5. Guardar en inbox_messages
-    const inboxId = await saveInboxMessage(msgId, text);
-    console.log(`✅ Mensaje guardado en inbox: ${inboxId}`);
+    // 5. Manejar comando /vincular (solo para colaboradores)
+    if (!isOwner && text.trim().startsWith('/vincular')) {
+      await handleVincularCommand(chatId, text);
+      return res.status(200).json({ ok: true });
+    }
 
-    // 6. Responder inmediatamente
+    // 6. Guardar en inbox_messages
+    const inboxId = await saveInboxMessage(msgId, text);
+    console.log(`✅ Mensaje guardado en inbox: ${inboxId} (de ${isOwner ? 'owner' : share.label})`);
+
+    // 7. Responder inmediatamente
     await sendTelegramMessage(chatId, '⏳ Procesando...');
 
-    // 7. Detectar si es un comando
+    // 8. Detectar si es un comando
     if (text.startsWith('/')) {
       const esComando = await procesarComando(chatId, text);
       if (esComando) {
@@ -55,7 +71,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
       }
     }
 
-    // 8. Detectar si es una consulta
+    // 9. Detectar si es una consulta
     if (esConsulta(text)) {
       console.log(`🤔 Detectada consulta: "${text}"`);
       const answer = await procesarConsulta(text);
@@ -63,10 +79,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
       return res.status(200).json({ ok: true });
     }
 
-    // 9. Construir contexto para el parser
-    const context = await buildContext();
+    // 10. Construir contexto para el parser
+    const context = await buildContext(share?.project_id);
 
-    // 10. Parsear mensaje con Gemini
+    // 11. Parsear mensaje con Gemini
     let result;
     try {
       result = await parseMessage(text, context);
@@ -77,7 +93,17 @@ router.post('/webhook', async (req: Request, res: Response) => {
       return res.status(200).json({ ok: true });
     }
 
-    // 11. Ejecutar acciones y recopilar resultados
+    // 12. Si es colaborador, forzar project_id del share
+    if (share && share.project_id) {
+      result.acciones = result.acciones.map((accion: any) => {
+        if (accion.tipo === 'crear_tarea' || accion.tipo === 'crear_gasto' || accion.tipo === 'crear_nota') {
+          return { ...accion, project_id: share.project_id };
+        }
+        return accion;
+      });
+    }
+
+    // 13. Ejecutar acciones y recopilar resultados
     let results;
     try {
       results = await executeActions(result.acciones, inboxId);
@@ -87,18 +113,18 @@ router.post('/webhook', async (req: Request, res: Response) => {
       return res.status(200).json({ ok: true });
     }
 
-    // 12. Verificar si hay dudas que enviar por Telegram
+    // 14. Verificar si hay dudas que enviar por Telegram
     const dudas = result.acciones
       .filter((accion: any) => accion.tipo === 'consulta' && accion.duda)
       .map((accion: any) => accion.duda);
 
-    // 13. Construir mensaje de respuesta
+    // 15. Construir mensaje de respuesta
     let mensaje = '';
     if (results.length > 0) {
       mensaje += `✅ Procesado:\n\n${results.join('\n')}`;
     }
 
-    // 14. Si hay dudas, agregarlas al mensaje
+    // 16. Si hay dudas, agregarlas al mensaje
     if (dudas.length > 0) {
       const mensajeDudas = `❓ Necesito más información:\n\n${dudas.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}`;
       
@@ -109,7 +135,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
       }
     }
 
-    // 15. Enviar mensaje final (o mensaje por defecto si no hay nada que reportar)
+    // 17. Enviar mensaje final (o mensaje por defecto si no hay nada que reportar)
     if (!mensaje) {
       mensaje = '✅ Recibido';
     }
@@ -128,23 +154,34 @@ router.post('/webhook', async (req: Request, res: Response) => {
   }
 });
 
-async function buildContext(): Promise<ParserContext> {
+async function buildContext(projectId?: string | null): Promise<ParserContext> {
   // Fecha actual en ISO 8601
   const ahora_iso = new Date().toISOString();
 
-  // Proyectos existentes
-  const proyectosResult = await query(
-    `SELECT id, name, client FROM projects WHERE archived_at IS NULL`
-  );
+  // Proyectos existentes (filtrado por project_id si se proporciona)
+  let proyectosQuery = `SELECT id, name, client FROM projects WHERE archived_at IS NULL`;
+  const proyectosParams: any[] = [];
+  
+  if (projectId) {
+    proyectosQuery += ` AND id = $1`;
+    proyectosParams.push(projectId);
+  }
+  
+  const proyectosResult = await query(proyectosQuery, proyectosParams);
   const proyectos_existentes = proyectosResult.rows;
 
-  // Tareas abiertas recientes (últimas 30)
-  const tareasResult = await query(
-    `SELECT id, title FROM tasks 
-     WHERE status IN ('pendiente', 'en_proceso') 
-     ORDER BY created_at DESC 
-     LIMIT 30`
-  );
+  // Tareas abiertas recientes (últimas 30, filtrado por project_id si se proporciona)
+  let tareasQuery = `SELECT id, title FROM tasks WHERE status IN ('pendiente', 'en_proceso')`;
+  const tareasParams: any[] = [];
+  
+  if (projectId) {
+    tareasQuery += ` AND project_id = $1`;
+    tareasParams.push(projectId);
+  }
+  
+  tareasQuery += ` ORDER BY created_at DESC LIMIT 30`;
+  
+  const tareasResult = await query(tareasQuery, tareasParams);
   const tareas_abiertas_recientes = tareasResult.rows;
 
   return {

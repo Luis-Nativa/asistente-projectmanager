@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Share2, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Share2, Plus, Trash2, RefreshCw, Link } from 'lucide-react';
 
 interface Share {
   id: string;
@@ -112,6 +112,16 @@ export function ShareManagement() {
     } catch (error) {
       console.error('Error regenerating PIN:', error);
       alert('Error al regenerar el PIN');
+    }
+  };
+
+  const handleGenerateVinculationCode = async (id: string) => {
+    try {
+      const result = await api.shares.generateVinculationCode(id);
+      alert(`Código de vinculación generado: ${result.code}\n\nExpira en ${result.expiresIn} segundos.\n\nEl colaborador debe enviar:\n/vincular ${result.code}\n\nEl código también fue enviado a tu Telegram.`);
+    } catch (error) {
+      console.error('Error generating vinculation code:', error);
+      alert('Error al generar código de vinculación');
     }
   };
 
@@ -277,6 +287,14 @@ export function ShareManagement() {
                     </p>
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleGenerateVinculationCode(share.id)}
+                      title="Generar código de vinculación de Telegram"
+                    >
+                      <Link className="w-4 h-4" />
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
