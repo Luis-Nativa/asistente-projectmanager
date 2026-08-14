@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import type { Request, Response } from 'express';
 import telegramRoutes from './routes/telegram.js';
 import authRoutes from './routes/auth.js';
@@ -6,6 +7,12 @@ import apiRoutes from './routes/api.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+// Configurar CORS para permitir requests desde el frontend
+app.use(cors({
+  origin: '*', // Permitir todos los orígenes (puedes restringir después)
+  credentials: true
+}));
 
 app.use(express.json());
 
