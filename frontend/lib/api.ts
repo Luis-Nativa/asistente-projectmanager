@@ -153,4 +153,8 @@ export const api = {
     update: (id: string, data: any) => request(`/api/notes/${id}`, { method: 'PATCH', body: data }),
     delete: (id: string) => request(`/api/notes/${id}`, { method: 'DELETE' }),
   },
+  
+  ask: {
+    query: (question: string) => request('/api/ask', { method: 'POST', body: { question } }),
+  },
 };

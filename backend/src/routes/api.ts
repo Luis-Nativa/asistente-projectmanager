@@ -973,4 +973,24 @@ router.patch('/subtasks/:id', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/ask - Consultas en lenguaje natural
+router.post('/ask', async (req: Request, res: Response) => {
+  try {
+    const { question } = req.body;
+    
+    if (!question) {
+      return res.status(400).json({ error: 'La pregunta es obligatoria' });
+    }
+    
+    // Importar dinámicamente para evitar dependencias circulares
+    const { procesarConsulta } = await import('../services/consultas.js');
+    const answer = await procesarConsulta(question);
+    
+    res.json({ answer });
+  } catch (error) {
+    console.error('❌ Error en POST /api/ask:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 export default router;
