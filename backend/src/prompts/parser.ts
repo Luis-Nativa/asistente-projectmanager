@@ -31,6 +31,14 @@ REGLAS DURAS:
 22. RECURRENCIA: "cada semana", "semanal", "todos los lunes", "10 por semana" → llena recurrence con diaria|semanal|quincenal|mensual. Una tarea recurrente no lleva due_at.
 23. ÁREAS vs PROYECTOS: un subtema dentro de un proyecto conocido (marketing, legal, mantenimiento, obra, contenido) va en tags, NUNCA como proyecto nuevo. Solo crea un proyecto si es una iniciativa o inmueble distinto, con presupuesto y vida propia.
 24. CALIBRACIÓN DE URGENCIA: un volcado de planeación normalmente NO tiene urgencias. Usa priority 1 solo si se dice explícitamente ("urgente", "ya se me pasó", "es para hoy"). Si más del 20% de las acciones de un mensaje te salen con priority 1, estás sobrecalificando: revísalas.
+25. RECORDATORIOS: Si el usuario pide explícitamente que le recuerden algo ("recuérdame", "avísame", "no se me olvide", "recordar en X tiempo"), genera el campo remind_at con la fecha/hora del recordatorio.
+    - "recuérdame en 2 horas" → remind_at = ahora_iso + 2 horas
+    - "avísame mañana a las 10am" → remind_at = mañana 10:00
+    - "no se me olvide el viernes" → remind_at = viernes 09:00
+    - "recordar en 2 minutos" → remind_at = ahora_iso + 2 minutos
+    - Si no hay solicitud explícita de recordatorio, NO generes remind_at (déjalo null)
+    - remind_at es INDEPENDIENTE de due_at: due_at es la fecha límite, remind_at es cuándo avisar
+    - Ejemplo: "entregar informe el viernes, recuérdame el jueves" → due_at = viernes 09:00, remind_at = jueves 09:00
 
 TIPOS DE ACCIÓN: crear_tarea | crear_subtareas | crear_gasto | crear_nota | crear_proyecto | completar_tarea | consulta
 
@@ -52,6 +60,15 @@ Ejemplo 4: "hay que modificar el copy de la campaña para que diga solo adultos 
   - crear_tarea: title "Modificar el copy de la campaña", tags ["marketing", "ads"]
   - crear_nota: content "Tarifario: habitaciones desde $1,600, $1,700 y $1,800", tags ["precios"]
   (NOTA: CERO gastos, los precios de venta NO son gastos)
+
+Ejemplo 5: "recordar en 2 minutos revisar el correo urgente"
+→ 1 acción: crear_tarea con title "Revisar el correo", priority 1, remind_at = ahora_iso + 2 minutos
+
+Ejemplo 6: "mañana tengo reunión a las 3pm, recuérdame una hora antes"
+→ 1 acción: crear_tarea con title "Reunión", due_at = mañana 15:00, remind_at = mañana 14:00
+
+Ejemplo 7: "no se me olvide llamar a Juan el viernes"
+→ 1 acción: crear_tarea con title "Llamar a Juan", due_at = viernes 09:00, remind_at = viernes 09:00
 
 Devuelve un JSON con la estructura: { acciones: [...] }`;
 
