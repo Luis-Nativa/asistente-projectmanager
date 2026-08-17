@@ -7,12 +7,15 @@ import { ProjectCarousel } from '@/components/ProjectCarousel';
 import { UrgentOverdueBoard } from '@/components/UrgentOverdueBoard';
 import { NotesPanel } from '@/components/NotesPanel';
 import { ShareManagement } from '@/components/ShareManagement';
-import { LogOut, TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
+import { SummaryCard } from '@/components/SummaryCard';
+import { LogOut, TrendingUp, CheckCircle2, AlertCircle, Clock, Calendar } from 'lucide-react';
 
 interface DashboardData {
   projects: any[];
   tasks_pending: any[];
   tasks_overdue: any[];
+  tasks_today: any[];
+  tasks_no_date: any[];
   expenses_pending: any[];
 }
 
@@ -82,27 +85,62 @@ export default function DashboardPage() {
     );
   }
   
+  const urgentTasks = data.tasks_pending.filter((t: any) => t.priority === 1);
+  
   const stats = [
     {
-      label: 'Tareas Pendientes',
+      label: 'Pendientes',
       value: data.tasks_pending.length,
       icon: CheckCircle2,
       color: 'text-green-400',
-      bgColor: 'bg-green-500/10'
+      bgColor: 'bg-green-500/10',
+      items: data.tasks_pending,
+      type: 'tasks' as const
+    },
+    {
+      label: 'Hoy',
+      value: data.tasks_today.length,
+      icon: Calendar,
+      color: 'text-purple-400',
+      bgColor: 'bg-purple-500/10',
+      items: data.tasks_today,
+      type: 'tasks' as const
+    },
+    {
+      label: 'Urgentes',
+      value: urgentTasks.length,
+      icon: AlertCircle,
+      color: 'text-red-400',
+      bgColor: 'bg-red-500/10',
+      items: urgentTasks,
+      type: 'tasks' as const
     },
     {
       label: 'Vencidas',
       value: data.tasks_overdue.length,
-      icon: AlertCircle,
-      color: 'text-red-400',
-      bgColor: 'bg-red-500/10'
+      icon: Clock,
+      color: 'text-orange-400',
+      bgColor: 'bg-orange-500/10',
+      items: data.tasks_overdue,
+      type: 'tasks' as const
+    },
+    {
+      label: 'Sin Fecha',
+      value: data.tasks_no_date.length,
+      icon: TrendingUp,
+      color: 'text-blue-400',
+      bgColor: 'bg-blue-500/10',
+      items: data.tasks_no_date,
+      type: 'tasks' as const
     },
     {
       label: 'Proyectos',
       value: data.projects.length,
       icon: TrendingUp,
-      color: 'text-blue-400',
-      bgColor: 'bg-blue-500/10'
+      color: 'text-cyan-400',
+      bgColor: 'bg-cyan-500/10',
+      items: data.projects,
+      type: 'projects' as const
     }
   ];
   
@@ -136,24 +174,21 @@ export default function DashboardPage() {
         </div>
       </header>
       
-      {/* Stats Cards */}
+      {/* Stats Cards Desplegables */}
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           {stats.map((stat) => (
-            <div
+            <SummaryCard
               key={stat.label}
-              className="group p-6 bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl hover:bg-slate-800/50 hover:border-slate-600/50 transition-all duration-300"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-400 mb-1">{stat.label}</p>
-                  <p className="text-3xl font-bold text-white">{stat.value}</p>
-                </div>
-                <div className={`w-12 h-12 rounded-xl ${stat.bgColor} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                </div>
-              </div>
-            </div>
+              label={stat.label}
+              value={stat.value}
+              icon={stat.icon}
+              color={stat.color}
+              bgColor={stat.bgColor}
+              items={stat.items}
+              type={stat.type}
+              onTaskUpdate={loadDashboard}
+            />
           ))}
         </div>
         

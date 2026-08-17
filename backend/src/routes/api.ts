@@ -69,6 +69,9 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    
     // Obtener tareas vencidas
     const tasksOverdueResult = await query(
       `SELECT t.*, p.name as project_name,
@@ -81,6 +84,33 @@ router.get('/dashboard', async (req: Request, res: Response) => {
          AND ($3::boolean OR t.private = false)
        ORDER BY t.due_at`,
       [today, scope.project_id, scope.role === 'owner']
+    );
+    
+    // Obtener tareas de hoy
+    const tasksTodayResult = await query(
+      `SELECT t.*, p.name as project_name
+       FROM tasks t
+       LEFT JOIN projects p ON p.id = t.project_id
+       WHERE t.status IN ('pendiente', 'en_proceso')
+         AND t.due_at >= $1
+         AND t.due_at <= $2
+         AND ($3::uuid IS NULL OR t.project_id = $3)
+         AND ($4::boolean OR t.private = false)
+       ORDER BY t.priority`,
+      [today, todayEnd, scope.project_id, scope.role === 'owner']
+    );
+    
+    // Obtener tareas sin fecha
+    const tasksNoDateResult = await query(
+      `SELECT t.*, p.name as project_name
+       FROM tasks t
+       LEFT JOIN projects p ON p.id = t.project_id
+       WHERE t.status IN ('pendiente', 'en_proceso')
+         AND t.due_at IS NULL
+         AND ($1::uuid IS NULL OR t.project_id = $1)
+         AND ($2::boolean OR t.private = false)
+       ORDER BY t.priority`,
+      [scope.project_id, scope.role === 'owner']
     );
     
     // Obtener gastos pendientes
@@ -98,6 +128,8 @@ router.get('/dashboard', async (req: Request, res: Response) => {
       projects: projectsWithBudget,
       tasks_pending: tasksPendingResult.rows,
       tasks_overdue: tasksOverdueResult.rows,
+      tasks_today: tasksTodayResult.rows,
+      tasks_no_date: tasksNoDateResult.rows,
       expenses_pending: scope.can_see_money ? expensesPendingResult.rows : []
     });
   } catch (error) {
@@ -621,6 +653,42 @@ router.patch('/projects/:id', async (req: Request, res: Response) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('❌ Error en PATCH /api/projects/:id:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// DELETE /api/projects/:id - Archivar proyecto (soft delete)
+router.delete('/projects/:id', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    const { id } = req.params;
+    
+    if (!scope.can_create) {
+      return res.status(403).json({ error: 'No autorizado para eliminar proyectos' });
+    }
+    
+    const existingResult = await query('SELECT * FROM projects WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    const project = existingResult.rows[0];
+    
+    if (scope.project_id && id !== scope.project_id) {
+      return res.status(403).json({ error: 'No autorizado para este proyecto' });
+    }
+    
+    await query('UPDATE projects SET archived_at = now() WHERE id = $1', [id]);
+    
+    // Registrar en activity
+    await query(
+      `INSERT INTO activity (share_id, actor_label, entity_type, entity_id, action, detail)
+       VALUES ($1, $2, 'project', $3, 'elimino', $4)`,
+      [scope.id, scope.label, id, JSON.stringify({ name: project.name })]
+    );
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('❌ Error en DELETE /api/projects/:id:', error);
     res.status(500).json({ error: 'Error interno' });
   }
 });

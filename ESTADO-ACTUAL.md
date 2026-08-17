@@ -95,7 +95,7 @@ curl -X POST https://pendientes-telegram-backend.onrender.com/internal/tick \
 - PIN: `459342`
 
 **Variables de entorno críticas:**
-- `TELEGRAM_BOT_TOKEN`: 8557872456:AAGFxmTDzPzQgfKCeLw1SZqVARvEbBMp-g4
+- `TELEGRAM_BOT_TOKEN`: (ver backend/.env.local)
 - `TELEGRAM_CHAT_ID`: 8579813350
 - `CRON_SECRET`: (ver en Render → Environment)
 

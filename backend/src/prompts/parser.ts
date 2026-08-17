@@ -40,7 +40,11 @@ REGLAS DURAS:
     - remind_at es INDEPENDIENTE de due_at: due_at es la fecha límite, remind_at es cuándo avisar
     - Ejemplo: "entregar informe el viernes, recuérdame el jueves" → due_at = viernes 09:00, remind_at = jueves 09:00
 
-TIPOS DE ACCIÓN: crear_tarea | crear_subtareas | crear_gasto | crear_nota | crear_proyecto | completar_tarea | consulta
+26. RENOMBRAR PROYECTO: si el usuario dice "cambiar nombre de X a Y", "renombrar proyecto X", "llamar Y al proyecto X" → emite acción tipo "renombrar_proyecto" con target_project_id = id del proyecto en proyectos_existentes y project_name = nuevo nombre. NO crees un proyecto nuevo.
+27. BORRAR/ARCHIVAR PROYECTO: si el usuario dice "borrar proyecto X", "eliminar proyecto X", "quitar proyecto X", "ya no existe el proyecto X" → emite acción tipo "archivar_proyecto" con target_project_id = id del proyecto en proyectos_existentes.
+28. UNIR PROYECTOS: si el usuario dice "unir proyecto X con Y", "combinar X e Y", "mover todo de X a Y", "juntar los proyectos X y Y" → emite acción tipo "unir_proyectos" con target_project_id = id del proyecto origen (el que se borra) y merge_into_project_id = id del proyecto destino (donde se mueve todo).
+
+TIPOS DE ACCIÓN: crear_tarea | crear_subtareas | crear_gasto | crear_nota | crear_proyecto | completar_tarea | consulta | renombrar_proyecto | archivar_proyecto | unir_proyectos
 
 EJEMPLOS:
 
@@ -70,6 +74,16 @@ Ejemplo 6: "mañana tengo reunión a las 3pm, recuérdame una hora antes"
 Ejemplo 7: "no se me olvide llamar a Juan el viernes"
 → 1 acción: crear_tarea con title "Llamar a Juan", due_at = viernes 09:00, remind_at = viernes 09:00
 
+Ejemplo 8: "cambia el nombre de Casa Nativa a Casa Grande"
+→ 1 acción: { tipo: "renombrar_proyecto", target_project_id: "uuid-casa-nativa", project_name: "Casa Grande" }
+(NOTA: NO crees un proyecto nuevo, usa renombrar_proyecto)
+
+Ejemplo 9: "borra el proyecto Casa Nativa ya no existe"
+→ 1 acción: { tipo: "archivar_proyecto", target_project_id: "uuid-casa-nativa" }
+
+Ejemplo 10: "une el proyecto Casa Nativa con Casa Grande, mueve todo a Casa Grande"
+→ 1 acción: { tipo: "unir_proyectos", target_project_id: "uuid-casa-nativa", merge_into_project_id: "uuid-casa-grande" }
+
 Devuelve un JSON con la estructura: { acciones: [...] }`;
 
 export const PARSER_SCHEMA = {
@@ -82,7 +96,7 @@ export const PARSER_SCHEMA = {
         properties: {
           tipo: {
             type: 'string',
-            enum: ['crear_tarea', 'crear_subtareas', 'crear_gasto', 'crear_nota', 'crear_proyecto', 'completar_tarea', 'consulta']
+            enum: ['crear_tarea', 'crear_subtareas', 'crear_gasto', 'crear_nota', 'crear_proyecto', 'completar_tarea', 'consulta', 'renombrar_proyecto', 'archivar_proyecto', 'unir_proyectos']
           },
           title: { type: 'string' },
           detail: { type: 'string' },
@@ -111,6 +125,8 @@ export const PARSER_SCHEMA = {
             items: { type: 'string' }
           },
           target_task_id: { type: 'string' },
+          target_project_id: { type: 'string' },
+          merge_into_project_id: { type: 'string' },
           content: { type: 'string' },
           budget_amount: { type: 'number' },
           question: { type: 'string' },

@@ -10,7 +10,7 @@ export interface ParserContext {
 }
 
 export interface Accion {
-  tipo: 'crear_tarea' | 'crear_subtareas' | 'crear_gasto' | 'crear_nota' | 'crear_proyecto' | 'completar_tarea' | 'consulta';
+  tipo: 'crear_tarea' | 'crear_subtareas' | 'crear_gasto' | 'crear_nota' | 'crear_proyecto' | 'completar_tarea' | 'consulta' | 'renombrar_proyecto' | 'archivar_proyecto' | 'unir_proyectos';
   title?: string;
   detail?: string;
   project_id?: string;
@@ -29,6 +29,8 @@ export interface Accion {
   kind?: 'gasto' | 'ingreso';
   subtasks?: string[];
   target_task_id?: string;
+  target_project_id?: string;
+  merge_into_project_id?: string;
   content?: string;
   budget_amount?: number;
   question?: string;

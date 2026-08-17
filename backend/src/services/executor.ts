@@ -34,6 +34,18 @@ export async function executeActions(acciones: Accion[], inboxMessageId: number)
         case 'consulta':
           results.push(`❓ Consulta: ${accion.question}`);
           break;
+        case 'renombrar_proyecto':
+          await renombrarProyecto(accion);
+          results.push(`✅ Proyecto renombrado a: ${accion.project_name}`);
+          break;
+        case 'archivar_proyecto':
+          await archivarProyecto(accion);
+          results.push(`✅ Proyecto archivado`);
+          break;
+        case 'unir_proyectos':
+          await unirProyectos(accion);
+          results.push(`✅ Proyectos unidos`);
+          break;
         default:
           console.warn('⚠️ Tipo de acción desconocido:', accion.tipo);
       }
@@ -132,4 +144,34 @@ async function completarTarea(accion: Accion) {
      WHERE id = $1`,
     [accion.target_task_id]
   );
+}
+
+async function renombrarProyecto(accion: Accion) {
+  if (!accion.target_project_id || !accion.project_name) return;
+
+  await query(
+    `UPDATE projects SET name = $1 WHERE id = $2`,
+    [accion.project_name, accion.target_project_id]
+  );
+}
+
+async function archivarProyecto(accion: Accion) {
+  if (!accion.target_project_id) return;
+
+  await query(
+    `UPDATE projects SET archived_at = now() WHERE id = $1`,
+    [accion.target_project_id]
+  );
+}
+
+async function unirProyectos(accion: Accion) {
+  if (!accion.target_project_id || !accion.merge_into_project_id) return;
+
+  const sourceId = accion.target_project_id;
+  const targetId = accion.merge_into_project_id;
+
+  await query(`UPDATE tasks SET project_id = $1 WHERE project_id = $2`, [targetId, sourceId]);
+  await query(`UPDATE expenses SET project_id = $1 WHERE project_id = $2`, [targetId, sourceId]);
+  await query(`UPDATE notes SET project_id = $1 WHERE project_id = $2`, [targetId, sourceId]);
+  await query(`UPDATE projects SET archived_at = now() WHERE id = $1`, [sourceId]);
 }
