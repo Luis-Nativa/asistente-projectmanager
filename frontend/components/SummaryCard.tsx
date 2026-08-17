@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { api } from '@/lib/api';
 import { toast } from '@/components/ui/toast';
-import { ChevronDown, Clock, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
+import { ChevronDown, Clock, CheckCircle2, AlertCircle, TrendingUp, Pencil } from 'lucide-react';
+import { TaskEditModal } from '@/components/TaskEditModal';
 
 interface Task {
   id: string;
@@ -13,6 +14,7 @@ interface Task {
   priority: number;
   due_at?: string;
   status: string;
+  project_id?: string;
   project_name?: string;
 }
 
@@ -32,12 +34,14 @@ interface SummaryCardProps {
   items: Task[] | Project[];
   type: 'tasks' | 'projects';
   onTaskUpdate: () => void;
+  projects?: Project[];
 }
 
-export function SummaryCard({ label, value, icon: Icon, color, bgColor, items, type, onTaskUpdate }: SummaryCardProps) {
+export function SummaryCard({ label, value, icon: Icon, color, bgColor, items, type, onTaskUpdate, projects = [] }: SummaryCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const handleComplete = async (taskId: string) => {
     setCheckedIds((prev) => new Set(prev).add(taskId));
@@ -133,12 +137,24 @@ export function SummaryCard({ label, value, icon: Icon, color, bgColor, items, t
                       className="mt-0.5 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                     />
                     <div className="flex-1 min-w-0">
-                      <label
-                        htmlFor={`summary-${task.id}`}
-                        className="text-sm font-medium text-white cursor-pointer block hover:text-blue-300 transition-colors"
-                      >
-                        {task.title}
-                      </label>
+                      <div className="flex items-start justify-between gap-2">
+                        <label
+                          htmlFor={`summary-${task.id}`}
+                          className="text-sm font-medium text-white cursor-pointer block hover:text-blue-300 transition-colors"
+                        >
+                          {task.title}
+                        </label>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTask(task);
+                          }}
+                          className="shrink-0 p-1 rounded hover:bg-slate-700/50 text-slate-500 hover:text-blue-400 transition-colors"
+                          title="Editar tarea"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                       {task.detail && (
                         <p className="text-xs text-slate-400 mt-1 line-clamp-2">{task.detail}</p>
                       )}
@@ -188,6 +204,16 @@ export function SummaryCard({ label, value, icon: Icon, color, bgColor, items, t
         <div className="mt-4 pt-4 border-t border-slate-700/50 text-center py-4">
           <p className="text-sm text-slate-400">No hay elementos</p>
         </div>
+      )}
+
+      {editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          projects={projects}
+          open={!!editingTask}
+          onOpenChange={(open) => !open && setEditingTask(null)}
+          onSave={onTaskUpdate}
+        />
       )}
     </div>
   );

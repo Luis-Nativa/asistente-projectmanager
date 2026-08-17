@@ -188,6 +188,7 @@ export default function DashboardPage() {
               items={stat.items}
               type={stat.type}
               onTaskUpdate={loadDashboard}
+              projects={data.projects}
             />
           ))}
         </div>
@@ -200,6 +201,7 @@ export default function DashboardPage() {
             tasksPending={data.tasks_pending}
             tasksOverdue={data.tasks_overdue}
             onTaskUpdate={loadDashboard}
+            projects={data.projects}
           />
 
           <div className="pt-8 border-t border-slate-800">

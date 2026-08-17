@@ -578,6 +578,38 @@ router.post('/projects', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/projects/:id/history - Historial de tareas completadas
+router.get('/projects/:id/history', async (req: Request, res: Response) => {
+  try {
+    const scope = req.scope!;
+    const { id } = req.params;
+    
+    const existingResult = await query('SELECT * FROM projects WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    
+    if (scope.project_id && id !== scope.project_id) {
+      return res.status(403).json({ error: 'No autorizado para este proyecto' });
+    }
+    
+    const historyResult = await query(
+      `SELECT t.id, t.title, t.detail, t.completed_at, t.completed_by, t.tags, t.priority, t.due_at
+       FROM tasks t
+       WHERE t.project_id = $1
+         AND t.status = 'hecho'
+       ORDER BY t.completed_at DESC
+       LIMIT 100`,
+      [id]
+    );
+    
+    res.json({ history: historyResult.rows });
+  } catch (error) {
+    console.error('❌ Error en GET /api/projects/:id/history:', error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 // PATCH /api/projects/:id - Editar proyecto
 router.patch('/projects/:id', async (req: Request, res: Response) => {
   try {

@@ -136,6 +136,7 @@ export const api = {
     list: () => request('/api/projects'),
     create: (data: any) => request('/api/projects', { method: 'POST', body: data }),
     update: (id: string, data: any) => request(`/api/projects/${id}`, { method: 'PATCH', body: data }),
+    getHistory: (id: string) => request(`/api/projects/${id}/history`),
   },
   
   expenses: {

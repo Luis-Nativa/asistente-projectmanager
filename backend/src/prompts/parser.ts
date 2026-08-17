@@ -4,7 +4,7 @@ REGLAS DURAS:
 1. Un mensaje puede generar VARIAS acciones. Devuelve todas.
 2. Fechas: resuélvelas contra ahora_iso y devuélvelas en ISO 8601 con offset -06:00 o -05:00 según corresponda. "mañana"=+1 día, "el lunes"=próximo lunes, "en la semana"=viernes de esta semana. Si dicen día sin hora, usa 09:00. Si no hay ninguna referencia temporal, deja due_at en null. NO INVENTES FECHAS.
 3. Montos: extrae solo si el usuario dice un número. "ocho mil"=8000. Moneda default MXN. Si no hay monto explícito, no crees un gasto.
-4. Proyectos: si el mensaje menciona algo que coincide con proyectos_existentes, usa ese id en project_id. Si menciona un proyecto claramente nuevo, emite además una acción crear_proyecto. Si es ambiguo, deja project_id en null.
+4. Proyectos: si el mensaje menciona algo que coincide con proyectos_existentes, usa ese id en project_id. Si menciona un proyecto claramente nuevo, emite además una acción crear_proyecto. Si hay múltiples proyectos existentes y NO está claro a cuál pertenece la tarea, O si la tarea claramente debería tener proyecto pero no se menciona ninguno, devuelve una acción tipo "consulta" con el campo "duda" preguntando "¿Para qué proyecto es esta tarea?" y lista los proyectos disponibles. NO dejes project_id en null si hay duda.
 5. Prioridad: 1 solo si dice "urgente", "hoy mismo", "ya", "se me olvidó y era para ayer". 2 si tiene fecha en los próximos 2 días. 3 default. 4 si dice "algún día", "cuando se pueda", "idea".
 6. Si el texto es una idea, reflexión o dato sin acción posible → crear_nota.
 7. Si el mensaje es una PREGUNTA sobre lo ya capturado (cuánto llevo, qué tengo hoy, cómo va el proyecto X) → devuelve una sola acción tipo "consulta" con el texto original. NO inventes la respuesta.
@@ -83,6 +83,12 @@ Ejemplo 9: "borra el proyecto Casa Nativa ya no existe"
 
 Ejemplo 10: "une el proyecto Casa Nativa con Casa Grande, mueve todo a Casa Grande"
 → 1 acción: { tipo: "unir_proyectos", target_project_id: "uuid-casa-nativa", merge_into_project_id: "uuid-casa-grande" }
+
+Ejemplo 11: "mañana hay que comprar cemento" (hay 2 proyectos: Casa Nativa y Casa Grande)
+→ 1 acción: { tipo: "consulta", duda: "¿Para qué proyecto es la compra de cemento? Opciones: Casa Nativa, Casa Grande" }
+
+Ejemplo 12: "reunión con el arquitecto el lunes" (hay 1 proyecto: Casa Nativa)
+→ 1 acción: { tipo: "consulta", duda: "¿Esta reunión es para el proyecto Casa Nativa?" }
 
 Devuelve un JSON con la estructura: { acciones: [...] }`;
 

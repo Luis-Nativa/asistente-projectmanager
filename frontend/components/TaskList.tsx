@@ -7,7 +7,8 @@ import { toast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Clock, Pencil } from 'lucide-react';
+import { TaskEditModal } from '@/components/TaskEditModal';
 
 interface Task {
   id: string;
@@ -16,7 +17,13 @@ interface Task {
   priority: number;
   due_at?: string;
   status: string;
+  project_id?: string;
   project_name?: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
 }
 
 interface TaskListProps {
@@ -24,11 +31,13 @@ interface TaskListProps {
   tasks: Task[];
   onTaskUpdate: () => void;
   variant?: 'default' | 'overdue';
+  projects?: Project[];
 }
 
-export function TaskList({ title, tasks, onTaskUpdate, variant = 'default' }: TaskListProps) {
+export function TaskList({ title, tasks, onTaskUpdate, variant = 'default', projects = [] }: TaskListProps) {
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const handleComplete = async (taskId: string) => {
     setCheckedIds((prev) => new Set(prev).add(taskId));
@@ -149,12 +158,24 @@ export function TaskList({ title, tasks, onTaskUpdate, variant = 'default' }: Ta
                     className="mt-1 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                   />
                   <div className="flex-1 min-w-0">
-                    <label
-                      htmlFor={task.id}
-                      className="text-sm font-medium text-white cursor-pointer block hover:text-blue-300 transition-colors"
-                    >
-                      {task.title}
-                    </label>
+                    <div className="flex items-start justify-between gap-2">
+                      <label
+                        htmlFor={task.id}
+                        className="text-sm font-medium text-white cursor-pointer block hover:text-blue-300 transition-colors"
+                      >
+                        {task.title}
+                      </label>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTask(task);
+                        }}
+                        className="shrink-0 p-1 rounded hover:bg-slate-700/50 text-slate-500 hover:text-blue-400 transition-colors"
+                        title="Editar tarea"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     {task.detail && (
                       <p className="text-xs text-slate-400 mt-1 line-clamp-2">
                         {task.detail}
@@ -185,6 +206,16 @@ export function TaskList({ title, tasks, onTaskUpdate, variant = 'default' }: Ta
           })
         )}
       </CardContent>
+      
+      {editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          projects={projects}
+          open={!!editingTask}
+          onOpenChange={(open) => !open && setEditingTask(null)}
+          onSave={onTaskUpdate}
+        />
+      )}
     </Card>
   );
 }

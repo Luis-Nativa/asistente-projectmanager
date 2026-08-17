@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -10,7 +10,10 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { TrendingUp, DollarSign, CheckCircle2, Building2 } from 'lucide-react';
+import { TrendingUp, DollarSign, CheckCircle2, Building2, History, Clock } from 'lucide-react';
+import { api } from '@/lib/api';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Project {
   id: string;
@@ -25,6 +28,17 @@ interface Project {
   tasks_pending: number;
 }
 
+interface HistoryTask {
+  id: string;
+  title: string;
+  detail?: string;
+  completed_at: string;
+  completed_by?: string;
+  tags?: string[];
+  priority: number;
+  due_at?: string;
+}
+
 interface ProjectCardProps {
   project: Project;
   canSeeMoney: boolean;
@@ -32,6 +46,32 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, canSeeMoney }: ProjectCardProps) {
   const [open, setOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryTask[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    if (open && showHistory && history.length === 0) {
+      loadHistory();
+    }
+  }, [open, showHistory]);
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const data = await api.projects.getHistory(project.id);
+      setHistory(data.history || []);
+    } catch (error) {
+      console.error('Error cargando historial:', error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const formatCompletedDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return formatDistanceToNow(date, { addSuffix: true, locale: es });
+  };
 
   const budgetPercentage = project.budget_amount && project.spent
     ? (project.spent / project.budget_amount) * 100
@@ -179,6 +219,52 @@ export function ProjectCard({ project, canSeeMoney }: ProjectCardProps) {
                 <p className="text-sm whitespace-pre-wrap">{project.notes}</p>
               </div>
             )}
+
+            <div className="pt-2 border-t border-border">
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="w-full flex items-center justify-between py-2 text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <History className="w-4 h-4" />
+                  Historial de completadas
+                </span>
+                <span className="text-xs">{showHistory ? '▲' : '▼'}</span>
+              </button>
+
+              {showHistory && (
+                <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
+                  {historyLoading ? (
+                    <p className="text-xs text-slate-500 text-center py-4">Cargando...</p>
+                  ) : history.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-4">No hay tareas completadas</p>
+                  ) : (
+                    history.map((task) => (
+                      <div
+                        key={task.id}
+                        className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30"
+                      >
+                        <div className="flex items-start gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white line-through opacity-70">{task.title}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Clock className="w-3 h-3 text-slate-500" />
+                              <span className="text-xs text-slate-500">
+                                Completada {formatCompletedDate(task.completed_at)}
+                              </span>
+                            </div>
+                            {task.completed_by && (
+                              <p className="text-xs text-slate-600 mt-1">por {task.completed_by}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </SheetContent>
       </Sheet>
